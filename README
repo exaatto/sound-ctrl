@@ -1,0 +1,23 @@
+SOUND-CTRL
+
+  A naive script of controlling your computer by sound.
+  NOTE: This script has *NO* speech recognition feature.
+
+  The work flow is:
+    1. Capture a period (0.1s for now) raw PCM sound from 
+       microphone, using pyalsaaudio:
+          http://pyalsaaudio.sourceforge.net/
+    2. Filter out the "silient" periods by simply compare
+       avarage to a threshold.
+    3. Do FFT and get the base frequency, using scipy&numpy:
+          http://www.scipy.org/
+    4. Esecute commands according to the base frequency.
+
+TODO
+  The script is currently written in python, consuming about
+less than 10% of cpu which might be reduced by setting the
+threshold to ALSA instead of applying it after a capture and
+less than 15MB of resident RAM which is pretty acceptable to me.
+  I'm always considering re-write it in C/C++, but at this time
+I'm just too lazy to do that...
+

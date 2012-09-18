@@ -1,0 +1,97 @@
+#!/usr/bin/env python
+
+import sys
+import os
+import time
+import getopt
+import alsaaudio
+import struct
+from numpy import *
+import scipy.fftpack
+from scipy import pi
+
+VOLUME_THRESHOLD = 6000
+SEQ_LEN_THRESHOLD = 3
+freqs = scipy.fftpack.fftfreq(4410, 1/44100.0)
+class cmd:
+  def __init__(self, low, up, cmd_str):
+    self.low = low
+    self.up = up
+    self.cmd_str = cmd_str
+  def match(self, freq):
+    return (freq>=self.low and freq <=self.up)
+  def exe(self):
+    os.system(self.cmd_str)
+
+all_cmds = [
+    cmd(2200,2500,'/usr/bin/xeyes'),
+    ]
+
+def get_cmd(freqs):
+  cmds = list()
+  for f in freqs:
+    for c in all_cmds:
+      if (c.match(f)):
+        cmds.append(c)
+  return cmds
+
+def majority(cmds):
+  maj = dict()
+  for c in cmds:
+    if not maj.has_key(c):
+      maj[c] = 1
+    else:
+      maj[c] +=1
+  return sorted(maj, key=maj.get, reverse=True)[0]
+
+def usage():
+  sys.stderr.write('usage: recordtest.py [-c <card>] <file>\n')
+  sys.exit(2)
+
+def loud_enough(data,length):
+  s = sum(abs(data))/float(length)
+  return ( s > VOLUME_THRESHOLD )
+
+def do_fft(signal):
+  FFT = abs(scipy.fft(signal))
+  #print freqs[FFT[0:len(FFT)/2].argmax()], log10(FFT[0:len(FFT)/2].max())
+  #print list(FFT)
+  return freqs[FFT[0:len(FFT)/2].argmax()]
+
+if __name__ == '__main__':
+
+  card = 'default'
+
+  opts, args = getopt.getopt(sys.argv[1:], 'c:')
+  for o, a in opts:
+    if o == '-c':
+      card = a
+
+  inp = alsaaudio.PCM(alsaaudio.PCM_CAPTURE, alsaaudio.PCM_NORMAL, card)
+
+  inp.setchannels(1)
+  inp.setrate(44100)
+  inp.setformat(alsaaudio.PCM_FORMAT_S16_LE)
+  inp.setperiodsize(441)
+
+  seq = list()
+  while True:
+    data=''
+    length=0
+    while length < 4410:
+      l, d = inp.read()
+      length+=l
+      data+=d
+
+    data = array(struct.unpack('<'+str(length)+'h',data))
+    if loud_enough(data, length):
+      freq = do_fft(data)
+      seq.append(freq)
+    else:
+      if (len(seq) >= SEQ_LEN_THRESHOLD ):
+        cmds = get_cmd(seq)
+        if (len(cmds)>0):
+          the_cmd = majority(cmds)
+          the_cmd.exe()
+      seq = list()
+
