@@ -1,18 +1,19 @@
 #!/usr/bin/env python
 
 import sys
-import os
-import time
 import getopt
+import os
 import alsaaudio
 import struct
 from numpy import *
 import scipy.fftpack
 from scipy import pi
 
-VOLUME_THRESHOLD = 6000
+VOLUME_THRESHOLD = 3000
 SEQ_LEN_THRESHOLD = 3
 freqs = scipy.fftpack.fftfreq(4410, 1/44100.0)
+show = False
+
 class cmd:
   def __init__(self, low, up, cmd_str):
     self.low = low
@@ -24,7 +25,7 @@ class cmd:
     os.system(self.cmd_str)
 
 all_cmds = [
-    cmd(2200,2500,'/usr/bin/xeyes'),
+    cmd(2200,2500,'xdaliclock'),
     ]
 
 def get_cmd(freqs):
@@ -45,16 +46,19 @@ def majority(cmds):
   return sorted(maj, key=maj.get, reverse=True)[0]
 
 def usage():
-  sys.stderr.write('usage: recordtest.py [-c <card>] <file>\n')
+  sys.stderr.write('usage: sound-ctrl [-c <card>] [-s]\n')
   sys.exit(2)
 
 def loud_enough(data,length):
   s = sum(abs(data))/float(length)
+  #if show:
+  #  print "VOLUME [",s,"]"
   return ( s > VOLUME_THRESHOLD )
 
 def do_fft(signal):
   FFT = abs(scipy.fft(signal))
-  #print freqs[FFT[0:len(FFT)/2].argmax()], log10(FFT[0:len(FFT)/2].max())
+  if show:
+    print "FREQ   [",freqs[FFT[0:len(FFT)/2].argmax()],"]"
   #print list(FFT)
   return freqs[FFT[0:len(FFT)/2].argmax()]
 
@@ -62,10 +66,12 @@ if __name__ == '__main__':
 
   card = 'default'
 
-  opts, args = getopt.getopt(sys.argv[1:], 'c:')
+  opts, args = getopt.getopt(sys.argv[1:], 'sc:')
   for o, a in opts:
     if o == '-c':
       card = a
+    elif o == '-s':
+      show = True
 
   inp = alsaaudio.PCM(alsaaudio.PCM_CAPTURE, alsaaudio.PCM_NORMAL, card)
 
@@ -88,7 +94,7 @@ if __name__ == '__main__':
       freq = do_fft(data)
       seq.append(freq)
     else:
-      if (len(seq) >= SEQ_LEN_THRESHOLD ):
+      if (len(seq) >= SEQ_LEN_THRESHOLD ) and not show:
         cmds = get_cmd(seq)
         if (len(cmds)>0):
           the_cmd = majority(cmds)
